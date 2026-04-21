@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# env
+.env
+
+# uploads (images produits)
+uploads/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+
+# OS files
+.DS_Store
