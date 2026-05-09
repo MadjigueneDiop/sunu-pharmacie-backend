@@ -1,5 +1,3 @@
-// models/SupplyOrder.js
-
 import mongoose from "mongoose";
 
 const supplyOrderSchema = new mongoose.Schema(
@@ -22,6 +20,7 @@ const supplyOrderSchema = new mongoose.Schema(
           ref: "Product",
         },
         quantity: Number,
+        price: Number, 
       },
     ],
 
@@ -36,7 +35,7 @@ const supplyOrderSchema = new mongoose.Schema(
       required: true,
     },
 
-    deliveredAt: Date, // 🔥 ajout important
+    deliveredAt: Date,
   },
   { timestamps: true }
 );

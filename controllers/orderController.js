@@ -1,43 +1,72 @@
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
-import Notification from "../models/Notifications.js";
+import Delivery from "../models/Delivery.js";
 
-// CREATE ORDER
+// ================= CREATE ORDER =================
 export const createOrder = async (req, res) => {
   try {
-    const { products } = req.body;
+    const products = JSON.parse(req.body.products || "[]");
+    const total = Number(req.body.total || 0);
 
     if (!req.user) {
-      return res.status(401).json({ message: "Non connecté" });
+      return res.status(401).json({ message: "Non autorisé" });
     }
 
-    let total = 0;
-
-    for (const item of products) {
-      const product = await Product.findById(item.productId);
-
-      if (!product) {
-        return res.status(404).json({ message: "Produit introuvable" });
-      }
-
-      total += product.price * item.quantity;
-    }
-
-    // ✅ ICI TU CRÉES LA COMMANDE
-   const order = await Order.create({
-  userId: req.user._id,
-  products,
-  total,
-  supplierId: null // ou un vrai supplier
-});
-
-    // ✅ ICI TU AJOUTES LA NOTIFICATION
-    await Notification.create({
-      userId: req.user._id,
-      message: `Votre commande ${order._id.toString().slice(0, 6)} a été créée`,
-      type: "order",
+    const dbProducts = await Product.find({
+      _id: { $in: products.map(p => p.productId) }
     });
 
+    const needsPrescription = dbProducts.some(
+      (p) => p.requiresPrescription === true
+    );
+
+    // 🔥 DEBUG IMPORTANT
+    console.log("FILE RECEIVED:", req.file);
+
+    if (needsPrescription && !req.file) {
+      return res.status(400).json({
+        message: "📄 Ordonnance obligatoire"
+      });
+    }
+
+    let finalTotal = 0;
+
+    const formattedProducts = products.map((p) => {
+      const product = dbProducts.find(
+        (db) => db._id.toString() === p.productId
+      );
+
+      const price = product?.price || 0;
+      const quantity = Number(p.quantity || 1);
+
+      finalTotal += price * quantity;
+
+      return {
+        productId: p.productId,
+        quantity,
+        price,
+        category: product?.category,
+      };
+    });
+
+    const order = await Order.create({
+      userId: req.user._id,
+      products: formattedProducts,
+      total: total || finalTotal,
+
+      status: needsPrescription
+        ? "En attente ordonnance"
+        : "En attente",
+
+      // 🔥 FIX IMPORTANT
+      prescription: req.file
+        ? {
+            url: req.file.filename,
+            status: "En attente",
+          }
+        : null,
+    });
+console.log("FILE RECEIVED:", req.file);
     return res.status(201).json(order);
 
   } catch (error) {
@@ -45,33 +74,38 @@ export const createOrder = async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 };
-
+// ================= GET MY ORDERS (IMPORTANT FIX) =================
 export const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ userId: req.user._id })
-      .populate("products.productId", "name price image");
+      .populate("products.productId", "name price image category")
+      .lean(); // 🔥 IMPORTANT pour éviter bug mongoose
+
+    return res.json(orders);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+// ================= GET ALL ORDERS =================
+export const getOrders = async (req, res) => {
+  try {
+    const orders = await Order.find()
+      .populate("userId", "prenom nom email")
+      .populate("products.productId", "name price image category")
+      .sort({ createdAt: -1 });
 
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
-// UPDATE STATUS
-export const updateOrder = async (req, res) => {
-  try {
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
 
-    res.json(order);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
 
-// DELETE ORDER (OPTIONNEL)
+
+// ================= DELETE ORDER =================
 export const deleteOrder = async (req, res) => {
   try {
     await Order.findByIdAndDelete(req.params.id);
@@ -80,7 +114,11 @@ export const deleteOrder = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-export const validateOrder = async (req, res) => {
+
+
+
+// ================= UPDATE ORDER (🔥 REMIS PROPREMENT) =================
+export const updateOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
 
@@ -88,50 +126,154 @@ export const validateOrder = async (req, res) => {
       return res.status(404).json({ message: "Commande introuvable" });
     }
 
-    for (const item of order.products) {
-      const productId = item.productId?._id || item.productId;
-
-      if (!productId) continue;
-
-      await Product.findByIdAndUpdate(
-        productId,
-        { $inc: { quantity: -item.quantity } }
-      );
-    }
-
-    // ✅ UPDATE SAFE (sans save)
-    await Order.updateOne(
-      { _id: order._id },
-      { status: "Validée" }
-    );
-
-    await Notification.create({
-      userId: order.userId,
-      message: `Commande ${order._id.toString().slice(0, 6)} validée`,
-      type: "order",
-      isRead: false,
+    // 🔥 mise à jour flexible
+    Object.keys(req.body).forEach((key) => {
+      order[key] = req.body[key];
     });
 
-    return res.json({
-      message: "Commande validée + stock mis à jour",
-    });
+    await order.save();
 
-  } catch (err) {
-    console.log("❌ validateOrder ERROR:", err);
-    return res.status(500).json({ message: err.message });
-  }
-};
-export const getOrders = async (req, res) => {
-  try {
-    const orders = await Order.find()
-      .populate("userId", "prenom nom email")
-      .populate("products.productId", "name price image");
-
-    res.json(orders);
+    res.json(order);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
+
+
+// ================= UPDATE STATUS ORDER =================
+export const updateOrderStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: "Commande introuvable" });
+    }
+
+    order.status = status;
+
+    if (!order.tracking) order.tracking = [];
+
+    order.tracking.push({
+      status,
+      by: req.user._id,
+      role: req.user.role,
+      date: new Date(),
+    });
+
+    if (status === "Livrée") {
+      order.deliveredAt = new Date();
+    }
+
+    await order.save();
+
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+
+// ================= VALIDATE PRESCRIPTION =================
+export const validatePrescription = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: "Commande introuvable" });
+    }
+
+    if (!order.prescription?.url) {
+      return res.status(400).json({ message: "Pas d'ordonnance" });
+    }
+
+    order.prescription.status = "Validée";
+    order.prescriptionStatus = "Validée";
+
+    await order.save();
+
+    res.json(order);
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+
+// ================= REJECT PRESCRIPTION =================
+export const rejectPrescription = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: "Commande introuvable" });
+    }
+
+    order.prescription.status = "Rejetée";
+    order.prescriptionStatus = "Rejetée";
+
+    order.status = "Annulée";
+
+    await order.save();
+
+    res.json(order);
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+
+// ================= VALIDATE ORDER =================
+export const validateOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id).populate("userId");
+
+    if (!order) {
+      return res.status(404).json({ message: "Commande introuvable" });
+    }
+
+    if (
+      order.prescription &&
+      order.prescription.status !== "Validée"
+    ) {
+      return res.status(400).json({
+        message: "Ordonnance non validée",
+      });
+    }
+
+    // ✅ STATUT PHARMACIEN
+    order.status = "Validée";
+    order.deliveryStatus = "en attente"; // 🔥 TRÈS IMPORTANT
+    order.validatedAt = new Date();
+
+    await order.save();
+
+    // ✅ CHECK SI DELIVERY EXISTE
+    const exists = await Delivery.findOne({ orderId: order._id });
+
+    if (!exists) {
+      await Delivery.create({
+        orderId: order._id,
+        userId: order.userId._id,
+        adresse: order.userId.adresse,
+        telephone: order.userId.telephone,
+        deliveryStatus: "en attente", // 🔥 ici c’est pour Delivery
+      });
+    }
+
+    return res.json(order);
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+// ================= GET ORDER BY ID =================
 export const getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)

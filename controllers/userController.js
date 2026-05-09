@@ -4,6 +4,8 @@ import jwt from "jsonwebtoken";
 import { sendEmail } from "../utils/sendEmail.js";
 import crypto from "crypto";
 import Supplier from "../models/Supplier.js";
+import mongoose from "mongoose";
+
 
 //TOKEN (VERSION PRO)//
 const generateToken = (user) => {
@@ -22,60 +24,91 @@ const generateToken = (user) => {
 //  REGISTER //
 export const registerUser = async (req, res) => {
   try {
-    const { prenom, nom, email, password, role } = req.body;
+    const {
+      prenom,
+      nom,
+      email,
+      password,
+      adresse,
+      telephone,
+      role,
+    } = req.body;
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email déjà utilisé" });
-    }
+    const exist = await User.findOne({ email });
+    if (exist) return res.status(400).json({ message: "Email existe" });
 
-    const allowedRoles = [
-      "client",
-      "livreur",
-      "fournisseur",
-      "pharmacien"
-    ];
+    const hashed = await bcrypt.hash(password, 10);
 
-    const roleFinal = allowedRoles.includes(role) ? role : "client";
+    const isClient = !role || role === "client";
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const files = req.files || {};
 
     const user = await User.create({
       prenom,
       nom,
       email,
-      password: hashedPassword,
-      role: roleFinal,
+      password: hashed,
+      adresse,
+      telephone,
+      role: role || "client",
+      isVerified: isClient ? true : false,
+
+      proofDocuments: {
+        cni: files.cni?.[0]?.path?.replace(/\\/g, "/"),
+diploma: files.diploma?.[0]?.path?.replace(/\\/g, "/"),
+pharmacyLicense: files.pharmacyLicense?.[0]?.path?.replace(/\\/g, "/"),
+rc: files.rc?.[0]?.path?.replace(/\\/g, "/"),
+ninea: files.ninea?.[0]?.path?.replace(/\\/g, "/"),
+drivingLicense: files.drivingLicense?.[0]?.path?.replace(/\\/g, "/"),
+vehicleCard: files.vehicleCard?.[0]?.path?.replace(/\\/g, "/"),
+selfie: files.selfie?.[0]?.path?.replace(/\\/g, "/"),
+      },
     });
 
-    // 🔥 FIX ICI
-    if (roleFinal === "fournisseur") {
-      await Supplier.create({
-        name: `${prenom} ${nom}`,
-        email,
-        userId: user._id,
-        phone: "",
-        address: "",
-      });
-    }
 
-    await sendEmail(
-      email,
-      "Inscription réussie",
-      `Bonjour ${prenom}, votre compte a été créé 🎉`
-    );
+    res.status(201).json(user);
+    // EMAIL APRÈS CRÉATION
+if (isClient) {
+  await sendEmail(
+    email,
+    "Bienvenue sur SunuPharmacie",
+    `
+Bonjour ${prenom},
 
-    res.status(201).json({
-      message: "Utilisateur créé",
-      token: generateToken(user),
-      user,
-    });
+Votre compte a été créé avec succès 🎉
 
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+Vous pouvez maintenant vous connecter et commander des médicaments.
+
+Merci de votre confiance,
+SunuPharmacie
+    `
+  );
+} else {
+  await sendEmail(
+    email,
+    "Demande en cours de validation",
+    `
+Bonjour ${prenom},
+
+Votre inscription a bien été reçue ✅
+
+Votre compte (${role}) est actuellement en attente de validation par notre équipe.
+
+Vous recevrez un email dès que votre compte sera activé.
+
+Merci,
+SunuPharmacie
+    `
+  );
+}
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
+
 //LOGIN
+// LOGIN
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -83,23 +116,59 @@ export const loginUser = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({ message: "Utilisateur introuvable" });
+      return res.status(400).json({ message: "User introuvable" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
       return res.status(400).json({ message: "Mot de passe incorrect" });
     }
 
-    user.isOnline = true;
-    await user.save();
+    // 🔥 1. COMPTE BLOQUÉ
+    if (user.isBlocked) {
+      return res.status(403).json({
+        message: "ACCOUNT_BLOCKED",
+      });
+    }
 
-    res.json({
-      message: "Connexion réussie",
-      token: generateToken(user), //IMPORTANT
-      user,
-    });
+    // 🔥 2. COMPTE REJETÉ
+    if (user.requestStatus === "rejected") {
+      return res.status(403).json({
+        message: "ACCOUNT_REJECTED",
+      });
+    }
+
+    // 🔥 3. EN ATTENTE
+    const needValidation =
+      ["pharmacien", "fournisseur", "livreur"].includes(user.role) &&
+      user.isVerified === false;
+
+    if (needValidation) {
+      return res.status(403).json({
+        message: "ACCOUNT_PENDING",
+        pending: true,
+      });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role, tokenVersion: user.tokenVersion },
+      "SECRET_KEY",
+      { expiresIn: "7d" }
+    );
+
+    const safeUser = {
+      _id: user._id,
+      prenom: user.prenom,
+      nom: user.nom,
+      email: user.email,
+      role: user.role,
+      isVerified: user.isVerified,
+      isBlocked: user.isBlocked,
+      requestStatus: user.requestStatus,
+    };
+
+    res.json({ token, user: safeUser });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -214,9 +283,274 @@ export const resetPassword = async (req, res) => {
 };
 
 //UPDATE ROLE 
+// export const updateUserRole = async (req,res)=>{
+//   const {role} = req.body;
+
+//   const user = await User.findById(req.params.id);
+
+//   user.role = role;
+
+//   if(role === "pharmacien" || role === "fournisseur"){
+//     user.isVerified = false;
+//   }
+
+//   if(role === "livreur"){
+//     user.isVerified = true;
+//   }
+
+//   user.tokenVersion++;
+
+//   await user.save();
+
+//   res.json(user);
+// };
+// BLOCK / UNBLOCK USER
+
+export const toggleBlockUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur introuvable" });
+    }
+
+    // 🔥 normalisation propre
+    const wasBlocked = Boolean(user.isBlocked);
+
+    // toggle
+    user.isBlocked = !wasBlocked;
+
+    await user.save();
+
+    const isBlockedNow = Boolean(user.isBlocked);
+
+    // ================= EMAIL BLOQUAGE =================
+    if (!wasBlocked && isBlockedNow) {
+      await sendEmail(
+        user.email,
+        "Compte bloqué 🚫",
+        `Bonjour ${user.prenom},
+
+Votre compte a été bloqué par l'administration.
+
+SunuPharmacie`
+      );
+    }
+
+    // ================= EMAIL DÉBLOCAGE =================
+    else if (wasBlocked && !isBlockedNow) {
+      await sendEmail(
+        user.email,
+        "Compte réactivé ✅",
+        `Bonjour ${user.prenom},
+
+Bonne nouvelle 🎉 votre compte a été réactivé.
+
+Vous pouvez vous reconnecter.
+
+SunuPharmacie`
+      );
+    }
+
+    return res.json({
+      message: "Statut mis à jour",
+      user: {
+        _id: user._id,
+        isBlocked: user.isBlocked,
+      },
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const validateUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur introuvable" });
+    }
+
+    user.isVerified = true;
+    user.tokenVersion += 1;
+
+    await user.save();
+
+    // 🔥 EMAIL VALIDATION
+    await sendEmail(
+      user.email,
+      "Compte validé ✅",
+      `
+Bonjour ${user.prenom},
+
+🎉 Félicitations !
+
+Votre compte (${user.role}) a été validé.
+
+Vous pouvez maintenant accéder à votre espace.
+
+Merci,
+SunuPharmacie
+      `
+    );
+
+    res.json({
+      message: "Utilisateur validé",
+      user,
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+export const getPendingUsers = async (req, res) => {
+  try {
+    const users = await User.find({
+      isVerified: false,
+      role: { $ne: "client" }
+    }).select("-password");
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const requestRole = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    const { roleRequest } = req.body;
+
+    const allowed = ["pharmacien", "fournisseur", "livreur"];
+
+    if (!allowed.includes(roleRequest)) {
+      return res.status(400).json({ message: "Rôle interdit" });
+    }
+
+    if (user.requestStatus === "pending") {
+      return res.status(400).json({ message: "Déjà une demande en cours" });
+    }
+
+    user.roleRequest = roleRequest;
+    user.requestStatus = "pending";
+    user.isVerified = false;
+
+    if (req.file) {
+      user.proofDocument = req.file.path;
+    }
+
+    await user.save();
+
+    res.json({ message: "Demande envoyée à l'admin" });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const handleRoleRequest = async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) return res.status(404).json({ message: "User introuvable" });
+
+    if (user.requestStatus !== "pending") {
+      return res.status(400).json({ message: "Pas de demande active" });
+    }
+
+    if (status === "approved") {
+      user.role = user.roleRequest;
+      user.isVerified = true;
+    }
+
+    if (status === "rejected") {
+      user.roleRequest = "none";
+    }
+
+    user.requestStatus = status;
+    user.tokenVersion++;
+
+    await user.save();
+
+    res.json({ message: "Traitement effectué", user });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET USERS EN ATTENTE DE VALIDATION DOCUMENTS
+export const getPendingDocuments = async (req, res) => {
+  try {
+    const users = await User.find({
+      role: { $in: ["pharmacien", "fournisseur", "livreur"] },
+      isVerified: false,
+    }).select("-password");
+
+    console.log("PENDING USERS:", users);
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const rejectUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur introuvable" });
+    }
+
+    user.isVerified = false;
+    user.requestStatus = "rejected";
+
+    await user.save();
+
+    await sendEmail(
+      user.email,
+      "Demande rejetée ❌",
+      `
+Bonjour ${user.prenom},
+
+Votre demande (${user.role}) a été rejetée.
+
+👉 Vos documents sont invalides.
+
+SunuPharmacie
+      `
+    );
+
+    res.json({ message: "Utilisateur rejeté" });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 🔥 UPDATE ROLE (ADMIN - VERSION PRO)
 export const updateUserRole = async (req, res) => {
   try {
     const { role } = req.body;
+
+    const allowedRoles = [
+      "client",
+      "pharmacien",
+      "livreur",
+      "fournisseur",
+      "admin",
+    ];
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ message: "Rôle invalide" });
+    }
 
     const user = await User.findById(req.params.id);
 
@@ -224,34 +558,73 @@ export const updateUserRole = async (req, res) => {
       return res.status(404).json({ message: "Utilisateur introuvable" });
     }
 
+    // 🚫 éviter update inutile
+    if (user.role === role) {
+      return res.json({
+        message: "Aucun changement",
+        user,
+      });
+    }
+
+    const oldRole = user.role;
+
+    // 🔄 UPDATE ROLE
     user.role = role;
+
+    // 🔥 LOGIQUE MÉTIER
+    if (["pharmacien", "fournisseur"].includes(role)) {
+      user.isVerified = false;
+      user.requestStatus = "pending";
+    }
+
+    if (role === "livreur") {
+      user.isVerified = true;
+    }
+
+    if (role === "client") {
+      user.isVerified = true;
+    }
+
+    // 🔐 INVALIDER TOKENS
     user.tokenVersion += 1;
 
     await user.save();
 
-    // 🔥 SI devient fournisseur → créer Supplier si absent
-    if (role === "fournisseur") {
-      const existingSupplier = await Supplier.findOne({
-        userId: user._id,
-      });
+    // 📧 EMAIL NOTIFICATION
+    await sendEmail(
+      user.email,
+      "Changement de rôle",
+      `
+Bonjour ${user.prenom},
 
-      if (!existingSupplier) {
-        await Supplier.create({
-          name: `${user.prenom} ${user.nom}`,
-          email: user.email,
-          userId: user._id,
-          phone: "",
-          address: "",
-        });
-      }
-    }
+Votre rôle a été modifié.
+
+Ancien rôle : ${oldRole}
+Nouveau rôle : ${role}
+
+${
+  user.isVerified
+    ? "Votre compte est actif."
+    : "Votre compte nécessite une validation."
+}
+
+SunuPharmacie
+`
+    );
 
     res.json({
-      message: "Rôle mis à jour",
-      user,
+      message: "Rôle mis à jour avec succès",
+      user: {
+        _id: user._id,
+        role: user.role,
+        isVerified: user.isVerified,
+      },
     });
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      message: "Erreur serveur",
+      error: error.message,
+    });
   }
 };

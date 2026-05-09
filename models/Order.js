@@ -10,23 +10,25 @@ const orderSchema = new mongoose.Schema(
 
     supplierId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User", // ou "Supplier" si tu as un model séparé
-      required: false,
+      ref: "User",
     },
 
-    products: [
-      {
-        productId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
-          required: true,
-        },
-        quantity: {
-          type: Number,
-          required: true,
-        },
-      },
-    ],
+   products: [
+  {
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
+
+    quantity: Number,
+
+    // ⭐ AJOUT
+    category: String,
+    price: Number,
+    dosage: String,
+  },
+],
 
     total: {
       type: Number,
@@ -35,9 +37,58 @@ const orderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["En attente", "Validée", "Expédiée", "Livrée", "Annulée"],
+      enum: [
+        "En attente",
+        "Validée",
+        "Préparation",
+        "Expédiée",
+        "Livrée",
+        "Annulée",
+      ],
       default: "En attente",
     },
+
+    deliveryStatus: {
+      type: String,
+      enum: ["en attente", "en livraison", "livré"],
+      default: "en attente",
+    },
+
+    deliveredAt: Date,
+
+    seenByPharmacien: {
+      type: Boolean,
+      default: false,
+    },
+    // ✅ ORDONNANCE PROPRE
+    prescription: {
+      url: String,
+      status: {
+        type: String,
+        default: "En attente",
+      }
+    },
+requiresPrescription: {
+  type: Boolean,
+  default: false,
+},
+    // ⭐ TRACKING COMPLET
+    tracking: [
+      {
+        status: {
+          type: String,
+        },
+        date: {
+          type: Date,
+          default: Date.now,
+        },
+        by: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        role: String,
+      },
+    ],
   },
   { timestamps: true }
 );

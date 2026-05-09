@@ -2,17 +2,8 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    prenom: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    nom: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    prenom: { type: String, required: true },
+    nom: { type: String, required: true },
 
     email: {
       type: String,
@@ -22,46 +13,56 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
-    password: {
-      type: String,
-      required: true,
-      minlength: 6,
-    },
+    password: { type: String, required: true },
+
+    adresse: String,
+    telephone: String,
 
     role: {
       type: String,
-      enum: [
-        "admin",
-        "pharmacien",
-        "client",
-        "livreur",
-        "fournisseur",
-        "support",
-      ],
+      enum: ["admin", "client", "pharmacien", "fournisseur", "livreur"],
       default: "client",
     },
 
-    isOnline: {
+    // 🔐 VALIDATION
+    isVerified: { type: Boolean, default: false },
+
+    isBlocked: {
       type: Boolean,
       default: false,
     },
 
-    // 🔐 RESET PASSWORD
-    resetPasswordToken: {
+    // 🔁 DEMANDE DE ROLE
+    roleRequest: {
       type: String,
-      default: null,
+      enum: ["none", "pharmacien", "fournisseur", "livreur"],
+      default: "none",
     },
 
-    resetPasswordExpire: {
-      type: Date,
-      default: null,
+    requestStatus: {
+      type: String,
+      enum: ["none", "pending", "approved", "rejected"],
+      default: "none",
     },
 
-    // 🚨 AJOUT IMPORTANT (VERSION TOKEN)
-    tokenVersion: {
-      type: Number,
-      default: 0,
+    // 📄 DOCUMENTS
+    proofDocuments: {
+      cni: String,
+      diploma: String,
+      pharmacyLicense: String,
+      rc: String,
+      ninea: String,
+      drivingLicense: String,
+      vehicleCard: String,
+      selfie: String,
     },
+
+    // 🔐 TOKEN SECURITY
+    tokenVersion: { type: Number, default: 0 },
+
+    // 🔑 RESET PASSWORD
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
   },
   { timestamps: true }
 );

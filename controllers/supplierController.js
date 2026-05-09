@@ -48,70 +48,78 @@ export const getLowStockProducts = async (req, res) => {
 ========================================================= */
 export const createSupplyOrder = async (req, res) => {
   try {
-    // 1. Sécurité rôle
-    if (req.user.role !== "pharmacien") {
-      return res.status(403).json({ message: "Réservé au pharmacien" });
-    }
-
     const { products, supplierId } = req.body;
+
+    console.log("BODY 👉", req.body);
 
     if (!products || products.length === 0) {
       return res.status(400).json({ message: "Aucun produit" });
     }
 
-    let supplier;
-
-    // 🔥 PRIORITÉ : fournisseur choisi manuellement
-    if (supplierId) {
-      supplier = await Supplier.findById(supplierId);
-    } else {
-      // fallback automatique via produit
-      const firstProduct = await Product.findById(products[0].productId);
-
-      if (!firstProduct?.supplierId) {
-        return res.status(400).json({
-          message: "Produit sans fournisseur"
-        });
-      }
-
-      supplier = await Supplier.findById(firstProduct.supplierId);
-    }
+    const supplier = await Supplier.findById(supplierId);
 
     if (!supplier) {
       return res.status(404).json({
-        message: "Fournisseur introuvable"
+        message: "Fournisseur introuvable",
       });
     }
 
-    // 2. création commande
-    const order = await SupplyOrder.create({
-      products,
-      supplierId: supplier._id,
-      pharmacienId: req.user._id,
-      status: "Demandé",
-      total: 0
-    });
-
-    // 3. calcul total propre
     let total = 0;
+    const formattedProducts = [];
 
     for (const item of products) {
+      if (!item.productId) continue;
+
       const product = await Product.findById(item.productId);
-      if (product) {
-        total += product.price * item.quantity;
+
+      if (!product) {
+        console.log("Produit introuvable 👉", item.productId);
+        continue;
       }
+
+      const price = Number(product.price);
+      const quantity = Number(item.quantity);
+
+      if (isNaN(price) || isNaN(quantity) || quantity <= 0) continue;
+
+      const itemTotal = price * quantity;
+      total += itemTotal;
+
+      formattedProducts.push({
+        productId: product._id,
+        quantity,
+        price,
+      });
     }
 
-    order.total = total;
-    await order.save();
+    if (formattedProducts.length === 0) {
+      return res.status(400).json({
+        message: "Aucun produit valide",
+      });
+    }
 
-    console.log("✅ COMMANDE CRÉÉE :", order);
+    let order = await SupplyOrder.create({
+      supplierId,
+      pharmacienId: req.user._id,
+      products: formattedProducts,
+      total: Number(total.toFixed(2)),
+      status: "Demandé",
+    });
 
-    res.status(201).json(order);
+    // 🔥 POPULATE DIRECT (IMPORTANT)
+    order = await order.populate("supplierId", "name");
+    order = await order.populate(
+      "products.productId",
+      "name category quantity"
+    );
+
+    console.log("COMMANDE CRÉÉE 👉", order);
+
+    return res.status(201).json(order);
 
   } catch (err) {
-    console.log("❌ ERROR:", err);
-    res.status(500).json({ message: err.message });
+    console.log("CREATE ERROR 👉", err);
+    return res.status(500).json({ message: err.message });
   }
 };
 /* =========================================================
@@ -125,9 +133,6 @@ export const getSupplyOrders = async (req, res) => {
 
     const supplier = await Supplier.findOne({ userId: req.user._id });
 
-    console.log("USER:", req.user._id);
-    console.log("SUPPLIER:", supplier);
-
     if (!supplier) {
       return res.json([]);
     }
@@ -137,9 +142,15 @@ export const getSupplyOrders = async (req, res) => {
     })
       .populate("supplierId", "name email phone")
       .populate("pharmacienId", "prenom nom email")
-      .populate("products.productId", "name price");
-
-    console.log("ORDERS:", orders);
+      .populate({
+        path: "products.productId",
+        select: "name price category quantity",
+        populate: {
+          path: "category",
+          select: "name", // 🔥 IMPORTANT SI CATEGORY EST UNE COLLECTION
+        },
+      })
+      .sort({ createdAt: -1 });
 
     return res.json(orders);
 
@@ -147,7 +158,6 @@ export const getSupplyOrders = async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 };
-
 /* =========================================================
    6. LIVRAISON (MAJ STOCK + SÉCURITÉ)
 ========================================================= */
@@ -324,11 +334,15 @@ export const updateOrderStatus = async (req, res) => {
 
 export const getPharmacienOrders = async (req, res) => {
   try {
+
     const orders = await SupplyOrder.find({
       pharmacienId: req.user._id,
     })
       .populate("supplierId", "name email phone")
-      .populate("products.productId", "name price");
+      .populate("products.productId", "name category quantity")
+      .sort({ createdAt: -1 });
+
+    console.log("ORDERS 👉", orders);
 
     res.json(orders);
 
@@ -336,8 +350,6 @@ export const getPharmacienOrders = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
-
 
 export const ensureSupplierExists = async (req, res, next) => {
   try {
