@@ -13,13 +13,12 @@ const generateToken = (user) => {
     {
       id: user._id,
       role: user.role,
-      tokenVersion: user.tokenVersion, // IMPORTANT
+      tokenVersion: user.tokenVersion,
     },
-    "SECRET_KEY",
+    process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
 };
-
 
 //  REGISTER //
 export const registerUser = async (req, res) => {
@@ -150,12 +149,11 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role, tokenVersion: user.tokenVersion },
-      "SECRET_KEY",
-      { expiresIn: "7d" }
-    );
-
+   const token = jwt.sign(
+  { id: user._id, role: user.role, tokenVersion: user.tokenVersion },
+  process.env.JWT_SECRET,
+  { expiresIn: "7d" }
+);
     const safeUser = {
       _id: user._id,
       prenom: user.prenom,
