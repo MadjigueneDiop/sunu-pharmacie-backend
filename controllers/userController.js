@@ -33,14 +33,18 @@ export const registerUser = async (req, res) => {
       role,
     } = req.body;
 
+    const files = req.files || {};
+
+    const safePath = (f) =>
+      f?.[0]?.path?.replace(/\\/g, "/") || null;
+
     const exist = await User.findOne({ email });
-    if (exist) return res.status(400).json({ message: "Email existe" });
+    if (exist)
+      return res.status(400).json({ message: "Email existe" });
 
     const hashed = await bcrypt.hash(password, 10);
 
     const isClient = !role || role === "client";
-
-    const files = req.files || {};
 
     const user = await User.create({
       prenom,
@@ -53,59 +57,53 @@ export const registerUser = async (req, res) => {
       isVerified: isClient ? true : false,
 
       proofDocuments: {
-        cni: files.cni?.[0]?.path?.replace(/\\/g, "/"),
-diploma: files.diploma?.[0]?.path?.replace(/\\/g, "/"),
-pharmacyLicense: files.pharmacyLicense?.[0]?.path?.replace(/\\/g, "/"),
-rc: files.rc?.[0]?.path?.replace(/\\/g, "/"),
-ninea: files.ninea?.[0]?.path?.replace(/\\/g, "/"),
-drivingLicense: files.drivingLicense?.[0]?.path?.replace(/\\/g, "/"),
-vehicleCard: files.vehicleCard?.[0]?.path?.replace(/\\/g, "/"),
-selfie: files.selfie?.[0]?.path?.replace(/\\/g, "/"),
+        cni: safePath(files.cni),
+        diploma: safePath(files.diploma),
+        pharmacyLicense: safePath(files.pharmacyLicense),
+        rc: safePath(files.rc),
+        ninea: safePath(files.ninea),
+        drivingLicense: safePath(files.drivingLicense),
+        vehicleCard: safePath(files.vehicleCard),
+        selfie: safePath(files.selfie),
       },
     });
 
-
+    // 🔥 réponse immédiate (API rapide)
     res.status(201).json(user);
-    // EMAIL APRÈS CRÉATION
-if (isClient) {
-  await sendEmail(
-    email,
-    "Bienvenue sur SunuPharmacie",
-    `
-Bonjour ${prenom},
+
+    // 📧 email en background (NE bloque PAS API)
+    (async () => {
+      try {
+        if (isClient) {
+          await sendEmail(
+            email,
+            "Bienvenue sur SunuPharmacie",
+            `Bonjour ${prenom},
 
 Votre compte a été créé avec succès 🎉
 
-Vous pouvez maintenant vous connecter et commander des médicaments.
+SunuPharmacie`
+          );
+        } else {
+          await sendEmail(
+            email,
+            "Demande en cours de validation",
+            `Bonjour ${prenom},
 
-Merci de votre confiance,
-SunuPharmacie
-    `
-  );
-} else {
-  await sendEmail(
-    email,
-    "Demande en cours de validation",
-    `
-Bonjour ${prenom},
+Votre inscription est en attente de validation.
 
-Votre inscription a bien été reçue ✅
-
-Votre compte (${role}) est actuellement en attente de validation par notre équipe.
-
-Vous recevrez un email dès que votre compte sera activé.
-
-Merci,
-SunuPharmacie
-    `
-  );
-}
+SunuPharmacie`
+          );
+        }
+      } catch (emailError) {
+        console.log("❌ EMAIL ERROR (ignored):", emailError.message);
+      }
+    })();
 
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };
-
 //LOGIN
 // LOGIN
 export const loginUser = async (req, res) => {
