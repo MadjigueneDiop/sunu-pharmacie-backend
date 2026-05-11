@@ -58,6 +58,14 @@ router.post(
 
 router.post("/login", loginUser);
 
+router.put("/:id/block", protect, authorizeRoles("admin"), toggleBlockUser);
+
+
+router.put("/:id/validate", protect, authorizeRoles("admin"), validateUser);
+
+router.get("/pending", protect, authorizeRoles("admin"), getPendingUsers);
+
+router.put("/:id/reject", protect, authorizeRoles("admin"), rejectUser);
 
 // =========================
 // 👤 USER (ADMIN ONLY)
@@ -88,13 +96,6 @@ router.put("/reset-password/:token", resetPassword);
 // =========================
 // 🚫 BLOCK / VALIDATION
 // =========================
-router.put("/:id/block", protect, authorizeRoles("admin"), toggleBlockUser);
-
-router.put("/:id/validate", protect, authorizeRoles("admin"), validateUser);
-
-router.get("/pending", protect, authorizeRoles("admin"), getPendingUsers);
-
-router.put("/:id/reject", protect, authorizeRoles("admin"), rejectUser);
 
 
 // =========================

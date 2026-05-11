@@ -303,7 +303,6 @@ export const resetPassword = async (req, res) => {
 //   res.json(user);
 // };
 // BLOCK / UNBLOCK USER
-
 export const toggleBlockUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -312,42 +311,44 @@ export const toggleBlockUser = async (req, res) => {
       return res.status(404).json({ message: "Utilisateur introuvable" });
     }
 
-    // 🔥 normalisation propre
-    const wasBlocked = Boolean(user.isBlocked);
+    const wasBlocked = user.isBlocked === true;
 
-    // toggle
     user.isBlocked = !wasBlocked;
 
     await user.save();
 
-    const isBlockedNow = Boolean(user.isBlocked);
+    const isBlockedNow = user.isBlocked === true;
 
-    // ================= EMAIL BLOQUAGE =================
-    if (!wasBlocked && isBlockedNow) {
-      await sendEmail(
-        user.email,
-        "Compte bloqué 🚫",
-        `Bonjour ${user.prenom},
+    // ================= EMAIL SAFE (NE JAMAIS BLOQUER API) =================
+    try {
+      if (!wasBlocked && isBlockedNow) {
+        await sendEmail(
+          user.email,
+          "Compte bloqué 🚫",
+          `Bonjour ${user.prenom},
 
 Votre compte a été bloqué par l'administration.
 
 SunuPharmacie`
-      );
-    }
+        );
+      }
 
-    // ================= EMAIL DÉBLOCAGE =================
-    else if (wasBlocked && !isBlockedNow) {
-      await sendEmail(
-        user.email,
-        "Compte réactivé ✅",
-        `Bonjour ${user.prenom},
+      if (wasBlocked && !isBlockedNow) {
+        await sendEmail(
+          user.email,
+          "Compte réactivé ✅",
+          `Bonjour ${user.prenom},
 
 Bonne nouvelle 🎉 votre compte a été réactivé.
 
 Vous pouvez vous reconnecter.
 
 SunuPharmacie`
-      );
+        );
+      }
+    } catch (emailError) {
+      console.log("❌ EMAIL ERROR:", emailError.message);
+      // ⚠️ on ne casse pas l'API si email échoue
     }
 
     return res.json({
@@ -359,6 +360,7 @@ SunuPharmacie`
     });
 
   } catch (error) {
+    console.log("❌ TOGGLE ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };

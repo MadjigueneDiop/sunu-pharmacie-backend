@@ -1,5 +1,8 @@
 import express from "express";
 import cors from "cors";
+import dotenv from "dotenv";
+import path from "path";
+
 import { connectDB } from "./config/db.js";
 
 import userRoutes from "./routes/userRoutes.js";
@@ -10,10 +13,11 @@ import notificationsRoutes from "./routes/notificationsRoutes.js";
 import supplierRoutes from "./routes/supplierRoutes.js";
 import deliveryRoutes from "./routes/deliveryRoutes.js";
 
-import path from "path";
+dotenv.config(); // 🔥 OBLIGATOIRE
 
 const app = express();
 
+// DB CONNECTION
 connectDB();
 
 // MIDDLEWARES
@@ -32,7 +36,7 @@ app.use("/api/notifications", notificationsRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/livreur", deliveryRoutes);
 
-
+// HEALTH CHECK
 app.get("/", (req, res) => {
   res.json({
     message: "🚀 API SUNU PHARMACIE en ligne",
