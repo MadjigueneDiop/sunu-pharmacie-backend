@@ -21,7 +21,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// STATIC FILES (UPLOADS)
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // ROUTES
@@ -33,6 +32,16 @@ app.use("/api/notifications", notificationsRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/livreur", deliveryRoutes);
 
-app.listen(5000, () => {
-  console.log("Serveur backend 🚀 http://localhost:5000");
+
+app.get("/", (req, res) => {
+  res.json({
+    message: "🚀 API SUNU PHARMACIE en ligne",
+    status: "OK",
+  });
+});
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`Serveur backend 🚀 http://localhost:${PORT}`);
 });
