@@ -303,7 +303,7 @@ export const resetPassword = async (req, res) => {
 // BLOCK / UNBLOCK USER
 export const toggleBlockUser = async (req, res) => {
   try {
-    console.log("🔥 toggleBlockUser appelé");
+    console.log("🔥 BLOCK ROUTE START");
 
     const user = await User.findById(req.params.id);
 
@@ -311,47 +311,34 @@ export const toggleBlockUser = async (req, res) => {
       return res.status(404).json({ message: "Utilisateur introuvable" });
     }
 
-    const wasBlocked = user.isBlocked === true;
+    const wasBlocked = user.isBlocked;
 
-    user.isBlocked = !wasBlocked;
+    // 🔄 toggle propre
+    user.isBlocked = !user.isBlocked;
 
     await user.save();
 
-    console.log("✅ USER SAVED");
+    console.log("✅ USER UPDATED:", user.isBlocked);
 
-    const isBlockedNow = user.isBlocked === true;
+    // 📧 EMAIL LOGIQUE SIMPLE (IMPORTANT)
+    let subject = "";
+    let message = "";
+
+    if (user.isBlocked) {
+      subject = "Compte bloqué 🚫";
+      message = `Bonjour ${user.prenom}, votre compte a été bloqué.`;
+    } else {
+      subject = "Compte réactivé ✅";
+      message = `Bonjour ${user.prenom}, votre compte a été réactivé.`;
+    }
+
+    console.log("📧 PREP EMAIL");
 
     try {
-      console.log("📧 AVANT SENDEMAIL");
-
-      if (!wasBlocked && isBlockedNow) {
-        await sendEmail(
-          user.email,
-          "Compte bloqué 🚫",
-          `Bonjour ${user.prenom},
-
-Votre compte a été bloqué.
-
-SunuPharmacie`
-        );
-      }
-
-      if (wasBlocked && !isBlockedNow) {
-        await sendEmail(
-          user.email,
-          "Compte réactivé ✅",
-          `Bonjour ${user.prenom},
-
-Votre compte a été réactivé.
-
-SunuPharmacie`
-        );
-      }
-
-      console.log("✅ APRÈS SENDEMAIL");
-
-    } catch (emailError) {
-      console.log("❌ EMAIL ERROR:", emailError);
+      await sendEmail(user.email, subject, message);
+      console.log("📧 EMAIL SENT OK");
+    } catch (err) {
+      console.log("❌ EMAIL FAILED:", err.message);
     }
 
     return res.json({
@@ -363,10 +350,11 @@ SunuPharmacie`
     });
 
   } catch (error) {
-    console.log("❌ TOGGLE ERROR:", error);
+    console.log("❌ GLOBAL ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
+
 
 export const validateUser = async (req, res) => {
   try {
