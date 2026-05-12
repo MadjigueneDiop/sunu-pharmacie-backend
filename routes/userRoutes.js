@@ -169,4 +169,8 @@ router.get("/test-email", async (req, res) => {
 
   res.json({ message: "Email envoyé" });
 });
+
+router.get("/test-block", (req, res) => {
+  res.json({ ok: true });
+});
 export default router;
