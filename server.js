@@ -44,6 +44,7 @@ app.get("/", (req, res) => {
   });
 });
 console.log("RESEND KEY =", process.env.RESEND_API_KEY);
+console.log("🔥 SERVER STARTING...");
 
 const PORT = process.env.PORT || 5000;
 
