@@ -11,7 +11,7 @@ import {
 } from "../controllers/productController.js";
 
 import { protect } from "../middleware/auth.js";
-import upload from "../middleware/upload.js";
+import upload from "../middleware/uploadCloudinary.js";
 
 const router = express.Router();
 

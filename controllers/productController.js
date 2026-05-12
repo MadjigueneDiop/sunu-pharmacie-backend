@@ -8,7 +8,7 @@ import { generateDosages } from "../utils/generateDosages.js";
 import { checkLowStockAndAlert } from "../utils/checkLowStockAndAlert.js";
 
 // =======================
-// ➕ CREATE PRODUCT (SAFE)
+// ➕ CREATE PRODUCT
 // =======================
 export const createProduct = async (req, res) => {
   try {
@@ -31,12 +31,10 @@ export const createProduct = async (req, res) => {
     const parsedPrice = Number(price);
     const parsedQuantity = Number(quantity);
 
-    // 🔥 VALIDATION STRICTE
     if (!name || !category || !form) {
       return res.status(400).json({ message: "Champs obligatoires manquants" });
     }
 
-    // ❌ BLOQUE LES PRIX INVALIDES (FIX IMPORTANT)
     if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
       return res.status(400).json({ message: "Prix invalide" });
     }
@@ -64,7 +62,8 @@ export const createProduct = async (req, res) => {
       sideEffects,
       faq,
 
-      image: req.file ? req.file.filename : "",
+      // ✅ IMPORTANT FIX ICI
+      image: req.file ? req.file.path : "",
     });
 
     await checkLowStockAndAlert(product);
@@ -78,7 +77,7 @@ export const createProduct = async (req, res) => {
 };
 
 // =======================
-// ✏️ UPDATE PRODUCT (SAFE FIX)
+// ✏️ UPDATE PRODUCT
 // =======================
 export const updateProduct = async (req, res) => {
   try {
@@ -102,7 +101,6 @@ export const updateProduct = async (req, res) => {
 
     if (name) updateData.name = name;
 
-    // 🔥 PRICE SAFE FIX (IMPORTANT BUG FIX)
     if (price !== undefined) {
       const parsedPrice = Number(price);
 
@@ -140,7 +138,10 @@ export const updateProduct = async (req, res) => {
       updateData.packaging = generatePackaging(Number(price));
     }
 
-    if (req.file) updateData.image = req.file.filename;
+    // 🔥 FIX IMPORTANT IMAGE (Cloudinary + ancien système)
+    if (req.file) {
+      updateData.image = req.file.path;
+    }
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
@@ -175,9 +176,7 @@ export const getProducts = async (req, res) => {
   try {
     const { category } = req.query;
 
-    const products = await Product.find(
-      category ? { category } : {}
-    );
+    const products = await Product.find(category ? { category } : {});
 
     res.json(products);
 
