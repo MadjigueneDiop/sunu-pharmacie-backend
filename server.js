@@ -43,6 +43,7 @@ app.get("/", (req, res) => {
     status: "OK",
   });
 });
+console.log("RESEND KEY =", process.env.RESEND_API_KEY);
 
 const PORT = process.env.PORT || 5000;
 

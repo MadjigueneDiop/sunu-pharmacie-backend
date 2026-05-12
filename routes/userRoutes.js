@@ -161,20 +161,12 @@ router.get(
   getPendingDocuments
 );
 router.get("/test-email", async (req, res) => {
-  try {
-    await sendEmail(
-      "TON_EMAIL@gmail.com",
-      "TEST EMAIL",
-      "Email fonctionne ✅"
-    );
+  await sendEmail(
+    "madjiguened835@gmail.com",
+    "TEST SUNU PHARMACIE",
+    "Email OK depuis Resend 🚀"
+  );
 
-    res.json({ message: "Email envoyé" });
-
-  } catch (err) {
-    res.status(500).json({
-      error: err.message,
-    });
-  }
+  res.json({ message: "Email envoyé" });
 });
-
 export default router;

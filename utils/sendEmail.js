@@ -1,40 +1,24 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 export const sendEmail = async (to, subject, text) => {
-  console.log("📧 Tentative email vers :", to);
-
   try {
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false, // STARTTLS
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-      tls: {
-        rejectUnauthorized: false, // 🔥 important sur Render
-      },
-    });
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY manquante");
+    }
 
-    console.log("✅ Transporter créé");
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
-    const info = await transporter.sendMail({
-      from: `"SunuPharmacie" <${process.env.EMAIL_USER}>`,
+    const data = await resend.emails.send({
+      from: "SunuPharmacie <onboarding@resend.dev>",
       to,
       subject,
       text,
     });
 
-    console.log("✅ EMAIL ENVOYÉ :", info.messageId);
-
-    return info;
+    console.log("📧 EMAIL SENT OK");
+    return data;
 
   } catch (err) {
-    console.log("❌ EMAIL ERROR :", err);
-
-    // 🔥 utile pour debug Render
-    if (err.code) console.log("CODE:", err.code);
-    if (err.command) console.log("COMMAND:", err.command);
+    console.log("❌ EMAIL ERROR:", err.message);
   }
 };
