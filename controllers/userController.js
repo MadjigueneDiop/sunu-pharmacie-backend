@@ -303,6 +303,8 @@ export const resetPassword = async (req, res) => {
 // BLOCK / UNBLOCK USER
 export const toggleBlockUser = async (req, res) => {
   try {
+    console.log("🔥 toggleBlockUser appelé");
+
     const user = await User.findById(req.params.id);
 
     if (!user) {
@@ -315,17 +317,20 @@ export const toggleBlockUser = async (req, res) => {
 
     await user.save();
 
+    console.log("✅ USER SAVED");
+
     const isBlockedNow = user.isBlocked === true;
 
-    // ================= EMAIL SAFE (NE JAMAIS BLOQUER API) =================
     try {
+      console.log("📧 AVANT SENDEMAIL");
+
       if (!wasBlocked && isBlockedNow) {
         await sendEmail(
           user.email,
           "Compte bloqué 🚫",
           `Bonjour ${user.prenom},
 
-Votre compte a été bloqué par l'administration.
+Votre compte a été bloqué.
 
 SunuPharmacie`
         );
@@ -337,16 +342,16 @@ SunuPharmacie`
           "Compte réactivé ✅",
           `Bonjour ${user.prenom},
 
-Bonne nouvelle 🎉 votre compte a été réactivé.
-
-Vous pouvez vous reconnecter.
+Votre compte a été réactivé.
 
 SunuPharmacie`
         );
       }
+
+      console.log("✅ APRÈS SENDEMAIL");
+
     } catch (emailError) {
-      console.log("❌ EMAIL ERROR:", emailError.message);
-      // ⚠️ on ne casse pas l'API si email échoue
+      console.log("❌ EMAIL ERROR:", emailError);
     }
 
     return res.json({

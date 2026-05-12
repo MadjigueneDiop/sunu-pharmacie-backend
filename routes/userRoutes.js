@@ -18,6 +18,7 @@ import {
 } from "../controllers/userController.js";
 
 import upload from "../middleware/upload.js";
+import { sendEmail } from "../utils/sendEmail.js";
 
 import {
   protect,
@@ -159,5 +160,21 @@ router.get(
   authorizeRoles("admin"),
   getPendingDocuments
 );
+router.get("/test-email", async (req, res) => {
+  try {
+    await sendEmail(
+      "TON_EMAIL@gmail.com",
+      "TEST EMAIL",
+      "Email fonctionne ✅"
+    );
+
+    res.json({ message: "Email envoyé" });
+
+  } catch (err) {
+    res.status(500).json({
+      error: err.message,
+    });
+  }
+});
 
 export default router;
