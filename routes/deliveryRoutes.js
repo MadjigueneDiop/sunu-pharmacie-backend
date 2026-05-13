@@ -4,17 +4,12 @@ import { protect } from "../middleware/auth.js";
 
 const router = express.Router();
 
-/**
- * 📦 COMMANDES LIVREUR
- * 👉 IMPORTANT: on utilise deliveryStatus et PAS status
- */
 router.get("/delivery", protect, async (req, res) => {
   try {
     if (req.user.role !== "livreur") {
       return res.status(403).json({ message: "Accès refusé" });
     }
 
-    // ✅ SEULEMENT commandes validées par pharmacien
     const orders = await Order.find({
       status: { $in: ["Validée", "Expédiée", "Livrée"] },
       deliveryStatus: { $in: ["en attente", "en livraison", "livré"] }
@@ -27,9 +22,7 @@ router.get("/delivery", protect, async (req, res) => {
     res.status(500).json({ message: "Erreur serveur" });
   }
 });
-/**
- * 🚚 START DELIVERY
- */
+
 router.put("/:id/start-delivery", protect, async (req, res) => {
   try {
     if (req.user.role !== "livreur") {
@@ -44,7 +37,6 @@ router.put("/:id/start-delivery", protect, async (req, res) => {
 
     order.deliveryStatus = "en livraison";
 
-    // optionnel (ne casse pas le filtre)
     order.status = "Expédiée";
 
     await order.save();
@@ -56,9 +48,6 @@ router.put("/:id/start-delivery", protect, async (req, res) => {
   }
 });
 
-/**
- * ✅ CONFIRM DELIVERY
- */
 router.put("/:id/confirm-delivery", protect, async (req, res) => {
   try {
     if (req.user.role !== "livreur") {
@@ -73,7 +62,6 @@ router.put("/:id/confirm-delivery", protect, async (req, res) => {
 
     order.deliveryStatus = "livré";
 
-    // cohérence globale
     order.status = "Livrée";
 
     await order.save();

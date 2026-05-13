@@ -7,9 +7,6 @@ import { generatePackaging } from "../utils/generatePackaging.js";
 import { generateDosages } from "../utils/generateDosages.js";
 import { checkLowStockAndAlert } from "../utils/checkLowStockAndAlert.js";
 
-// =======================
-// ➕ CREATE PRODUCT
-// =======================
 export const createProduct = async (req, res) => {
   try {
     const {
@@ -62,7 +59,6 @@ export const createProduct = async (req, res) => {
       sideEffects,
       faq,
 
-      // ✅ IMPORTANT FIX ICI
       image: req.file ? req.file.path : "",
     });
 
@@ -76,9 +72,7 @@ export const createProduct = async (req, res) => {
   }
 };
 
-// =======================
-// ✏️ UPDATE PRODUCT
-// =======================
+
 export const updateProduct = async (req, res) => {
   try {
     const {
@@ -138,7 +132,6 @@ export const updateProduct = async (req, res) => {
       updateData.packaging = generatePackaging(Number(price));
     }
 
-    // 🔥 FIX IMPORTANT IMAGE (Cloudinary + ancien système)
     if (req.file) {
       updateData.image = req.file.path;
     }
@@ -169,9 +162,6 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-// =======================
-// 📦 GET PRODUCTS
-// =======================
 export const getProducts = async (req, res) => {
   try {
     const { category } = req.query;
@@ -185,9 +175,7 @@ export const getProducts = async (req, res) => {
   }
 };
 
-// =======================
-// 📦 SUPPLY PRODUCT
-// =======================
+
 export const supplyProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -239,9 +227,6 @@ export const supplyProduct = async (req, res) => {
   }
 };
 
-// =======================
-// ❌ DELETE PRODUCT
-// =======================
 export const deleteProduct = async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
@@ -263,9 +248,6 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
-// =======================
-// 🔍 GET PRODUCT BY ID
-// =======================
 export const getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);

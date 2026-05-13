@@ -20,9 +20,6 @@ export const createOrder = async (req, res) => {
       (p) => p.requiresPrescription === true
     );
 
-    // 🔥 DEBUG IMPORTANT
-    console.log("FILE RECEIVED:", req.file);
-
     if (needsPrescription && !req.file) {
       return res.status(400).json({
         message: "📄 Ordonnance obligatoire"
@@ -49,24 +46,27 @@ export const createOrder = async (req, res) => {
       };
     });
 
+    // 🔥 IMPORT CLOUDINARY RESULT (IMPORTANT)
+    let prescriptionData = null;
+
+    if (req.file) {
+      prescriptionData = {
+        url: req.file.path || req.file.secure_url, // ✔ CLOUDINARY
+        status: "En attente",
+      };
+    }
+
     const order = await Order.create({
       userId: req.user._id,
       products: formattedProducts,
       total: total || finalTotal,
-
       status: needsPrescription
         ? "En attente ordonnance"
         : "En attente",
 
-      // 🔥 FIX IMPORTANT
-      prescription: req.file
-        ? {
-            url: req.file.filename,
-            status: "En attente",
-          }
-        : null,
+      prescription: prescriptionData,
     });
-console.log("FILE RECEIVED:", req.file);
+
     return res.status(201).json(order);
 
   } catch (error) {

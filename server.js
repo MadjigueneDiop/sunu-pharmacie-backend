@@ -13,21 +13,17 @@ import notificationsRoutes from "./routes/notificationsRoutes.js";
 import supplierRoutes from "./routes/supplierRoutes.js";
 import deliveryRoutes from "./routes/deliveryRoutes.js";
 
-dotenv.config(); // 🔥 OBLIGATOIRE
+dotenv.config(); 
 
 const app = express();
 
-// DB CONNECTION
 connectDB();
 
-// MIDDLEWARES
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-// ROUTES
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
@@ -36,18 +32,17 @@ app.use("/api/notifications", notificationsRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/livreur", deliveryRoutes);
 
-// HEALTH CHECK
 app.get("/", (req, res) => {
   res.json({
-    message: "🚀 API SUNU PHARMACIE en ligne",
+    message: " API SUNU PHARMACIE en ligne",
     status: "OK",
   });
 });
 console.log("RESEND KEY =", process.env.RESEND_API_KEY);
-console.log("🔥 SERVER STARTING...");
+console.log(" SERVER STARTING...");
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Serveur backend 🚀 http://localhost:${PORT}`);
+  console.log(`Serveur backend  http://localhost:${PORT}`);
 });

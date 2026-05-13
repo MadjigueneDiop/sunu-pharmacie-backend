@@ -10,8 +10,6 @@ export const detectCategory = (name) => {
   if (n.includes("vitamine"))
     return "Compléments Alimentaires";
 
-//   if (n.includes("sirop"))
-//     return "General Health";
 
   if (n.includes("insuline") || n.includes("diabète"))
     return "Diabète";

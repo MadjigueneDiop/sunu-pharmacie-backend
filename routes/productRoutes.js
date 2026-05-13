@@ -80,8 +80,5 @@ router.put("/supply/:id", protect, supplyProduct);
 
 router.get("/:id", getProductById);
 
-// =====================
-// FIX PRICES ROUTE (ADMIN)
-// =====================
 
 export default router;

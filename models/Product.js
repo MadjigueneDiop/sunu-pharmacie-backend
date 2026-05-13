@@ -43,7 +43,13 @@ const productSchema = new mongoose.Schema(
         discount: Number,
       }
     ],
-
+image: String, // ancien champ (tu peux le garder)
+imageOld: String, // ancien lien sauvegardé
+imageCloudinary: String, // nouveau lien cloudinary
+imageSource: {
+  type: String,
+  default: "local" // local | cloudinary
+},
     // 📖 FICHE
     description: String,
     composition: String,

@@ -14,7 +14,7 @@ import {
   handleRoleRequest,
   getPendingDocuments,
   rejectUser,
-  updateUserRole // ✅ AJOUT ICI
+  updateUserRole 
 } from "../controllers/userController.js";
 
 import upload from "../middleware/upload.js";
@@ -31,17 +31,12 @@ import rateLimit from "express-rate-limit";
 const router = express.Router();
 
 
-// 🔥 RATE LIMIT (sécurité anti spam role request)
 const roleRequestLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 3,
   message: "Trop de demandes, réessayez dans une minute",
 });
 
-
-// =========================
-// 🔐 AUTH
-// =========================
 router.post(
   "/register",
   upload.fields([
@@ -68,9 +63,6 @@ router.get("/pending", protect, authorizeRoles("admin"), getPendingUsers);
 
 router.put("/:id/reject", protect, authorizeRoles("admin"), rejectUser);
 
-// =========================
-// 👤 USER (ADMIN ONLY)
-// =========================
 router.get("/", protect, authorizeRoles("admin"), getUsers);
 
 router.put("/:id", protect, authorizeRoles("admin"), updateUser);
@@ -78,7 +70,6 @@ router.put("/:id", protect, authorizeRoles("admin"), updateUser);
 router.delete("/:id", protect, authorizeRoles("admin"), deleteUser);
 
 
-// ✅ 🔥 CHANGE ROLE (IMPORTANT POUR TON FRONT)
 router.put(
   "/:id/role",
   protect,
@@ -87,9 +78,6 @@ router.put(
 );
 
 
-// =========================
-// 🔑 PASSWORD
-// =========================
 router.post("/forgot-password", forgotPassword);
 router.put("/reset-password/:token", resetPassword);
 

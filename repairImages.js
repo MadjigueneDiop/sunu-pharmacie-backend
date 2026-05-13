@@ -1,61 +1,73 @@
-// import mongoose from "mongoose";
-// import dotenv from "dotenv";
-// import fs from "fs";
-// import path from "path";
-// import Product from "./models/Product.js";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import Product from "./models/Product.js";
+import cloudinary from "./config/cloudinary.js";
+import axios from "axios";
 
-// dotenv.config();
+dotenv.config();
 
-// await mongoose.connect(process.env.MONGO_URI);
-// console.log("✅ MongoDB connecté");
+await mongoose.connect(process.env.MONGO_URI);
+console.log("MongoDB connecté");
 
-// const UPLOADS_DIR = path.join(process.cwd(), "uploads");
-// const BASE_URL = "https://sunu-pharmacie-backend-6.onrender.com";
+const products = await Product.find();
 
-// const buildImageUrl = (img) => {
-//   if (!img) return null;
+for (const p of products) {
+  if (!p.image) continue;
 
-//   if (img.startsWith("http")) return img;
+  // déjà migré
+  if (p.imageSource === "cloudinary") {
+    console.log("SKIP (déjà migré):", p.name);
+    continue;
+  }
 
-//   const filename = img.replace("uploads/", "").replace("\\", "/");
+  try {
+    console.log("Migration:", p.name);
 
-//   const localFile = path.join(UPLOADS_DIR, filename);
+    // 1. sauvegarde ancien lien
+    const oldImage = p.image;
 
-//   if (fs.existsSync(localFile)) {
-//     return `${BASE_URL}/uploads/${filename}`;
-//   }
+    // 2. download image
+    const response = await axios.get(oldImage, {
+      responseType: "arraybuffer",
+      timeout: 7000,
+    });
 
-//   return `${BASE_URL}/uploads/${filename}`;
-// };
+    const buffer = Buffer.from(response.data, "binary");
 
-// const run = async () => {
-//   try {
-//     const products = await Product.find();
+    // 3. upload cloudinary
+    const result = await new Promise((resolve, reject) => {
+      cloudinary.uploader
+        .upload_stream(
+          {
+            folder: "sunupharmacie",
+            resource_type: "image",
+          },
+          (err, res) => {
+            if (err) reject(err);
+            else resolve(res);
+          }
+        )
+        .end(buffer);
+    });
 
-//     let updated = 0;
+    // 4. update product SANS perdre ancien image
+    await Product.updateOne(
+      { _id: p._id },
+      {
+        $set: {
+          imageOld: oldImage,
+          imageCloudinary: result.secure_url,
+          image: result.secure_url,
+          imageSource: "cloudinary",
+        },
+      }
+    );
 
-//     for (const p of products) {
-//       if (!p.image) continue;
+    console.log("✔ Migré:", p.name);
+  } catch (err) {
+    console.log("❌ SKIP:", p.name);
+  }
+}
 
-//       const newUrl = buildImageUrl(p.image);
-
-//       if (newUrl && newUrl !== p.image) {
-//         await Product.updateOne(
-//           { _id: p._id },
-//           { $set: { image: newUrl } }
-//         );
-
-//         updated++;
-//       }
-//     }
-
-//     console.log(`🎯 TERMINÉ : ${updated} images corrigées`);
-//     process.exit();
-
-//   } catch (err) {
-//     console.log("❌ ERREUR:", err);
-//     process.exit(1);
-//   }
-// };
-
-// run();
+console.log("🎯 MIGRATION TERMINÉE");
+process.exit();
