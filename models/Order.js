@@ -23,7 +23,6 @@ const orderSchema = new mongoose.Schema(
 
     quantity: Number,
 
-    // ⭐ AJOUT
     category: String,
     price: Number,
     dosage: String,
@@ -60,7 +59,6 @@ const orderSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    // ✅ ORDONNANCE PROPRE
     prescription: {
       url: String,
       status: {
@@ -68,11 +66,21 @@ const orderSchema = new mongoose.Schema(
         default: "En attente",
       }
     },
+    paymentMethod: {
+  type: String,
+  enum: ["cash", "wave", "orange_money"],
+  required: true,
+},
+
+paymentStatus: {
+  type: String,
+  enum: ["pending", "success", "failed"],
+  default: "pending",
+},
 requiresPrescription: {
   type: Boolean,
   default: false,
 },
-    // ⭐ TRACKING COMPLET
     tracking: [
       {
         status: {

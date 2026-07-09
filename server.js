@@ -12,6 +12,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import notificationsRoutes from "./routes/notificationsRoutes.js";
 import supplierRoutes from "./routes/supplierRoutes.js";
 import deliveryRoutes from "./routes/deliveryRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 dotenv.config(); 
 
@@ -31,6 +32,9 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/suppliers", supplierRoutes);
 app.use("/api/livreur", deliveryRoutes);
+app.use("/api/payments",paymentRoutes
+);
+app.use('/uploads', express.static('uploads'));
 
 app.get("/", (req, res) => {
   res.json({
@@ -45,4 +49,4 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Serveur backend  http://localhost:${PORT}`);
-});
+}); 
